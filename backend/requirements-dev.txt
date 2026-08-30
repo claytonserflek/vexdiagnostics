@@ -1,0 +1,6 @@
+# Test-only dependencies. Not installed in production (see render.yaml,
+# which installs only requirements.txt) -- no reason to ship pytest/httpx
+# in the deployed API.
+-r requirements.txt
+pytest==8.3.3
+httpx==0.27.2

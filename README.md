@@ -54,10 +54,12 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-Run the test suite (deterministic, no hardware needed):
+Run the test suite (deterministic, no hardware needed). This needs
+`requirements-dev.txt` (pytest/httpx), which isn't installed in
+production:
 
 ```
-cd backend && source .venv/bin/activate && python -m pytest
+cd backend && source .venv/bin/activate && pip install -r requirements-dev.txt && python -m pytest
 ```
 
 ### Frontend
@@ -65,9 +67,13 @@ cd backend && source .venv/bin/activate && python -m pytest
 ```
 cd frontend
 npm install
-cp .env.example .env.local   # points the app at http://localhost:8000
 npm run dev
 ```
+
+`npm run dev` automatically points the app at `http://localhost:8000`
+via `.env.development` -- no setup needed. `.env.example` documents the
+`VITE_API_BASE_URL` variable if you ever want to override it locally via
+your own gitignored `.env.local`.
 
 Open the printed local URL. Import `sample-data/baseline_test.csv` and
 `sample-data/after_adjustment_test.csv` from the "Import Test" tab to try
@@ -84,6 +90,34 @@ actual test program, and read the honesty note at the top of that file
 -- it hasn't been hardware-tested in the environment this was built in,
 so budget time for a dry run and possible small API fixes against your
 VEXcode version.
+
+## Deploying to Render
+
+`render.yaml` at the repo root defines two services (this is genuinely
+two separate apps -- a Python API and a static frontend -- not one):
+
+- `vex-diagnostics-api` -- the FastAPI backend, as a Python **Web
+  Service**.
+- `vex-diagnostics-app` -- the built frontend, as a **Static Site**.
+
+Connect the repo in the Render dashboard as a Blueprint and it reads
+`render.yaml` automatically. One thing worth checking after the first
+deploy: the frontend's `VITE_API_BASE_URL` is pre-set in `render.yaml` to
+the backend's *predicted* URL (`https://vex-diagnostics-api.onrender.com`,
+derived from the service name). Render normally honors that exact name,
+but if it's already taken by someone else's Render service globally, your
+backend gets a different auto-generated URL instead. Compare the actual
+backend URL in the Render dashboard against that value; if they differ,
+update `VITE_API_BASE_URL` on the frontend service and redeploy it.
+
+Also worth knowing: the backend stores test history in a SQLite file on
+local disk. Render's free web services don't persist disk across deploys
+or restarts, so **test history will reset** whenever the backend
+redeploys or spins down from inactivity. That's fine for trying the app
+out; for real season-long history you'd want either a paid Render plan
+with a persistent Disk mounted at the SQLite path, or to swap in a
+hosted Postgres database -- not done here since it's a real infra
+decision, not something to default silently.
 
 ## Design principles this project follows
 

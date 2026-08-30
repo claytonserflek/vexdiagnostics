@@ -1,6 +1,13 @@
 import type { CompareResponse, TelemetrySeries, TestDetailResponse, TestListItem } from "./types";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+// No hardcoded localhost fallback here on purpose: the dev-only default
+// lives in .env.development (loaded by Vite only for `npm run dev`/build
+// mode "development", never bundled into a production build). In
+// production, this comes from the VITE_API_BASE_URL env var Render sets
+// at build time (see render.yaml); an empty string falls back to
+// relative requests against the same origin, which fails loudly instead
+// of silently pointing at a dev machine that doesn't exist in prod.
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {

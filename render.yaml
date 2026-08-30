@@ -1,0 +1,49 @@
+# Render Blueprint for VEX Diagnostics.
+#
+# This project is two separate apps, not one: a Python/FastAPI backend
+# (backend/) and a Vite/React static frontend (frontend/). This blueprint
+# deploys them as two Render services that talk to each other over HTTPS.
+#
+# IMPORTANT -- one manual check after your first deploy:
+# The frontend's VITE_API_BASE_URL below is set to the backend's PREDICTED
+# public URL, based on the `name` given to the backend service
+# (https://<name>.onrender.com). Render assigns that URL when the service
+# is first created, and normally honors the exact name given here -- but
+# if "vex-diagnostics-api" is already taken by someone else's Render
+# service, Render will append a random suffix instead, and this predicted
+# URL will be wrong. After deploying, compare the backend service's actual
+# URL (shown in the Render dashboard) against the value below; if they
+# differ, update VITE_API_BASE_URL on the frontend service to match and
+# trigger a manual redeploy of the frontend. See the repo README for
+# details.
+services:
+  - type: web
+    name: vex-diagnostics-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+
+  - type: web
+    name: vex-diagnostics-app
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    routes:
+      # This app currently has no client-side URL routing (navigation is
+      # in-memory React state, everything lives at "/"), so this rewrite
+      # isn't load-bearing today -- it's included so that if
+      # routing/deep links are added later, refreshing on a non-root path
+      # doesn't 404.
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://vex-diagnostics-api.onrender.com
