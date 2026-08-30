@@ -1,18 +1,49 @@
 import { useCallback, useEffect, useState } from "react";
 import "./index.css";
 import { listTests } from "./api";
-import type { TestListItem } from "./types";
-import { UploadPanel } from "./components/UploadPanel";
-import { TestHistoryList } from "./components/TestHistoryList";
-import { TestDetail } from "./components/TestDetail";
-import { CompareView } from "./components/CompareView";
+import type { TestDetailResponse, TestListItem } from "./types";
+import { AppShell, type NavKey } from "./components/AppShell";
+import { OverviewPage } from "./pages/OverviewPage";
+import { RunDiagnosticPage } from "./pages/RunDiagnosticPage";
+import { DiagnosticResultsPage } from "./pages/DiagnosticResultsPage";
+import { TestHistoryPage } from "./pages/TestHistoryPage";
+import { CompareTestsPage } from "./pages/CompareTestsPage";
+import { RobotSetupPage } from "./pages/RobotSetupPage";
+import { SettingsPage } from "./pages/SettingsPage";
+import { applyTheme, getStoredTheme, type ThemePreference } from "./theme";
 
-type View = { name: "upload" } | { name: "history" } | { name: "detail"; id: number } | { name: "compare"; id: number };
+type Route =
+  | { page: "overview" }
+  | { page: "run" }
+  | { page: "results"; testId: number }
+  | { page: "history" }
+  | { page: "compare"; beforeId?: number }
+  | { page: "setup" }
+  | { page: "settings" };
+
+const NAV_TITLE: Record<NavKey, string> = {
+  overview: "Overview",
+  run: "Run Diagnostic",
+  history: "Test History",
+  compare: "Compare Tests",
+  setup: "Robot Setup",
+  settings: "Settings",
+};
+
+function routeToNavKey(route: Route): NavKey {
+  if (route.page === "results") return "history";
+  return route.page;
+}
 
 export default function App() {
-  const [view, setView] = useState<View>({ name: "history" });
+  const [route, setRoute] = useState<Route>({ page: "overview" });
   const [tests, setTests] = useState<TestListItem[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [theme, setTheme] = useState<ThemePreference>(getStoredTheme);
+
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
 
   const refreshTests = useCallback(() => {
     listTests()
@@ -24,67 +55,44 @@ export default function App() {
     refreshTests();
   }, [refreshTests]);
 
+  function handleImported(result: TestDetailResponse) {
+    refreshTests();
+    setRoute({ page: "results", testId: result.test.id });
+  }
+
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          VEX Diagnostics
-          <span className="brand-sub">Drivetrain resistance mapping</span>
-        </div>
-        <button
-          className={`nav-item${view.name === "history" ? " active" : ""}`}
-          onClick={() => setView({ name: "history" })}
-          type="button"
-        >
-          Test History
-        </button>
-        <button
-          className={`nav-item${view.name === "upload" ? " active" : ""}`}
-          onClick={() => setView({ name: "upload" })}
-          type="button"
-        >
-          Import Test
-        </button>
-      </aside>
+    <AppShell active={routeToNavKey(route)} onNavigate={(key) => setRoute({ page: key })} mobileTitle={NAV_TITLE[routeToNavKey(route)]}>
+      {loadError && <div className="notice error">{loadError}</div>}
 
-      <main className="main-content">
-        {loadError && <div className="notice error">{loadError}</div>}
+      {route.page === "overview" && (
+        <OverviewPage tests={tests} onRunDiagnostic={() => setRoute({ page: "run" })} onOpenTest={(id) => setRoute({ page: "results", testId: id })} />
+      )}
 
-        {view.name === "upload" && (
-          <>
-            <h1 className="page-title">Import Test</h1>
-            <p className="page-subtitle">
-              Import a telemetry CSV exported from a standardized drivetrain diagnostic run.
-            </p>
-            <UploadPanel
-              onImported={(result) => {
-                refreshTests();
-                setView({ name: "detail", id: result.test.id });
-              }}
-            />
-          </>
-        )}
+      {route.page === "run" && <RunDiagnosticPage onComplete={handleImported} />}
 
-        {view.name === "history" && (
-          <>
-            <h1 className="page-title">Test History</h1>
-            <p className="page-subtitle">Every imported drivetrain diagnostic run for this robot.</p>
-            <TestHistoryList tests={tests} onSelect={(id) => setView({ name: "detail", id })} />
-          </>
-        )}
+      {route.page === "results" && (
+        <DiagnosticResultsPage
+          testId={route.testId}
+          onBack={() => setRoute({ page: "history" })}
+          onCompare={(id) => setRoute({ page: "compare", beforeId: id })}
+        />
+      )}
 
-        {view.name === "detail" && (
-          <TestDetail
-            testId={view.id}
-            onBack={() => setView({ name: "history" })}
-            onCompare={(id) => setView({ name: "compare", id })}
-          />
-        )}
+      {route.page === "history" && (
+        <TestHistoryPage
+          tests={tests}
+          onOpenTest={(id) => setRoute({ page: "results", testId: id })}
+          onRunDiagnostic={() => setRoute({ page: "run" })}
+        />
+      )}
 
-        {view.name === "compare" && (
-          <CompareView beforeId={view.id} tests={tests} onBack={() => setView({ name: "detail", id: view.id })} />
-        )}
-      </main>
-    </div>
+      {route.page === "compare" && (
+        <CompareTestsPage key={route.beforeId ?? "none"} tests={tests} initialBeforeId={route.beforeId} />
+      )}
+
+      {route.page === "setup" && <RobotSetupPage />}
+
+      {route.page === "settings" && <SettingsPage theme={theme} onThemeChange={setTheme} />}
+    </AppShell>
   );
 }

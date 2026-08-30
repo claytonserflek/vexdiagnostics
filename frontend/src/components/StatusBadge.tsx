@@ -1,34 +1,13 @@
-import type { OverallClassification } from "../types";
+import type { MotorClassification } from "../types";
+import { motorFindingStatus, STATUS_LABEL, type StatusTier } from "../health";
 
-const LABELS: Record<OverallClassification, string> = {
-  normal: "Normal",
-  possible: "Possible Resistance",
-  high: "High Resistance",
-  insufficient_data: "Insufficient Data",
-};
-
-export function StatusBadge({ classification }: { classification: OverallClassification }) {
-  return <span className={`badge ${classification}`}>{LABELS[classification]}</span>;
+export function StatusPill({ status, label }: { status: StatusTier | "unknown"; label?: string }) {
+  const className = status === "unknown" ? "neutral" : status;
+  const text = label ?? (status === "unknown" ? "No data" : STATUS_LABEL[status]);
+  return <span className={`badge ${className}`}>{text}</span>;
 }
 
-const MOTOR_CLASS_MAP: Record<string, OverallClassification> = {
-  Normal: "normal",
-  "Possible High Resistance": "possible",
-  "Possible Mechanism Binding": "possible",
-  "High Resistance": "high",
-};
-
-export function MotorStatusBadge({ classification }: { classification: string }) {
-  const mapped = MOTOR_CLASS_MAP[classification] ?? "insufficient_data";
-  return <span className={`badge ${mapped}`}>{classification}</span>;
-}
-
-export function classificationColorVar(classification: string): string {
-  const mapped = MOTOR_CLASS_MAP[classification] ?? "insufficient_data";
-  return `var(--${mapped === "insufficient_data" ? "unknown" : mapped})`;
-}
-
-export function classificationBgVar(classification: string): string {
-  const mapped = MOTOR_CLASS_MAP[classification] ?? "insufficient_data";
-  return `var(--${mapped === "insufficient_data" ? "unknown" : mapped}-bg)`;
+export function MotorStatusBadge({ classification }: { classification: MotorClassification }) {
+  const tier = motorFindingStatus(classification);
+  return <span className={`badge ${tier}`}>{classification}</span>;
 }
