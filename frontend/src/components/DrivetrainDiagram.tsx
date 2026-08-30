@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import type { MotorFinding, MotorSummary } from "../types";
 import {
-  estimateVelocityRpm,
   inferSlot,
   motorFindingStatus,
   statusColorVar,
@@ -24,11 +23,9 @@ const WHEEL_H = 64;
 export function DrivetrainDiagram({
   summaries,
   findings,
-  commandedRpm,
 }: {
   summaries: MotorSummary[];
   findings: MotorFinding[];
-  commandedRpm: number | null;
 }) {
   const findingByLabel = useMemo(() => new Map(findings.map((f) => [f.label, f])), [findings]);
   const placed = useMemo(() => {
@@ -133,7 +130,7 @@ export function DrivetrainDiagram({
             <div className="stat-row" style={{ gap: 20 }}>
               <div className="stat">
                 <div className="value" style={{ fontSize: "1rem" }}>
-                  <Num value={estimateVelocityRpm(activeSummary, commandedRpm)} digits={0} unit="RPM" />
+                  <Num value={activeSummary.avg_velocity_rpm_mean} digits={0} unit="RPM" />
                 </div>
                 <div className="label">Velocity</div>
               </div>

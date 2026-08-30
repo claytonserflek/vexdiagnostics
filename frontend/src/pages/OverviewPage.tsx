@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import { getTest } from "../api";
 import type { TestDetailResponse, TestListItem } from "../types";
-import { computeHealthScore, orderMotorsForDisplay, scoreToStatus, statusColorVar, STATUS_LABEL } from "../health";
+import {
+  computeHealthScore,
+  hasDrivetrainMotors,
+  orderMotorsForDisplay,
+  scoreToStatus,
+  statusColorVar,
+  STATUS_LABEL,
+} from "../health";
 import { StatusPill } from "../components/StatusBadge";
 import { MotorCard } from "../components/MotorCard";
 import { DrivetrainDiagram } from "../components/DrivetrainDiagram";
@@ -36,12 +43,12 @@ export function OverviewPage({
       <>
         <div className="page-header">
           <h1 className="page-title">Robot Health</h1>
-          <p className="page-subtitle">Latest drivetrain diagnostic</p>
+          <p className="page-subtitle">Latest robot diagnostic</p>
         </div>
         <div className="panel">
           <EmptyState
             title="No diagnostic tests yet"
-            hint="Run a standardized drivetrain test and import its telemetry CSV to see your robot's health here."
+            hint="Run a standardized test and import its telemetry CSV to see your robot's health here."
             action={
               <button type="button" className="btn primary" onClick={onRunDiagnostic}>
                 Run Diagnostic
@@ -62,7 +69,7 @@ export function OverviewPage({
       <>
         <div className="page-header">
           <h1 className="page-title">Robot Health</h1>
-          <p className="page-subtitle">Latest drivetrain diagnostic</p>
+          <p className="page-subtitle">Latest robot diagnostic</p>
         </div>
         <SkeletonPanel lines={2} />
         <SkeletonPanel lines={4} />
@@ -75,13 +82,14 @@ export function OverviewPage({
   const status = score === null ? "unknown" : scoreToStatus(score);
   const orderedMotors = orderMotorsForDisplay(diagnostics.motor_summaries);
   const findingByLabel = new Map(diagnostics.motor_findings.map((f) => [f.label, f]));
+  const showDrivetrain = hasDrivetrainMotors(diagnostics);
 
   return (
     <>
       <div className="page-header">
         <h1 className="page-title">Robot Health</h1>
         <p className="page-subtitle">
-          Latest drivetrain diagnostic &middot;{" "}
+          Latest robot diagnostic &middot;{" "}
           <button type="button" className="back-link" style={{ display: "inline", margin: 0 }} onClick={() => onOpenTest(latest.id)}>
             {test.name}
           </button>{" "}
@@ -114,28 +122,26 @@ export function OverviewPage({
         </div>
       </div>
 
-      <h2 style={{ fontSize: "0.95rem", margin: "28px 0 12px" }}>Drivetrain Motors</h2>
+      <h2 style={{ fontSize: "0.95rem", margin: "28px 0 12px" }}>Detected Motors</h2>
       <div className="motor-grid">
         {orderedMotors.map((s) => (
-          <MotorCard key={s.label} summary={s} finding={findingByLabel.get(s.label)} commandedRpm={test.commanded_cruise_rpm} />
+          <MotorCard key={s.label} summary={s} finding={findingByLabel.get(s.label)} />
         ))}
       </div>
 
-      <div className="panel section-gap">
-        <div className="panel-header">
-          <div>
-            <h3 className="panel-title">Drivetrain Layout</h3>
-            <p className="panel-hint" style={{ marginBottom: 0 }}>
-              Top-down view. Hover or select a motor for detail.
-            </p>
+      {showDrivetrain && (
+        <div className="panel section-gap">
+          <div className="panel-header">
+            <div>
+              <h3 className="panel-title">Drivetrain Layout</h3>
+              <p className="panel-hint" style={{ marginBottom: 0 }}>
+                Top-down view. Hover or select a motor for detail.
+              </p>
+            </div>
           </div>
+          <DrivetrainDiagram summaries={diagnostics.motor_summaries} findings={diagnostics.motor_findings} />
         </div>
-        <DrivetrainDiagram
-          summaries={diagnostics.motor_summaries}
-          findings={diagnostics.motor_findings}
-          commandedRpm={test.commanded_cruise_rpm}
-        />
-      </div>
+      )}
     </>
   );
 }

@@ -54,6 +54,20 @@ def _parse_optional_int(value: Optional[str]) -> Optional[int]:
         return None
 
 
+def _infer_default_test_type(rows: list) -> str:
+    """Used only when a CSV doesn't declare "# test_type=" itself. Purely
+    a display label -- it never gates which diagnostics actually run
+    (that's decided independently, per motor, by the diagnostics engine
+    itself). If the detected motor labels resolve to both a left and a
+    right side, this is almost certainly a drivetrain test; otherwise it's
+    labeled as generic motor telemetry."""
+    labels = {row["motor_label"] for row in rows}
+    sides = {diag.infer_side(label) for label in labels}
+    if "L" in sides and "R" in sides:
+        return "drivetrain_resistance_v1"
+    return "motor_telemetry_v1"
+
+
 def _diag_samples_from_dicts(rows: list) -> list:
     return [diag.TelemetrySample(**row) for row in rows]
 
@@ -123,7 +137,7 @@ async def import_test(file: UploadFile = File(...), db: Session = Depends(get_db
     test = models.Test(
         name=meta.get("test_name") or file.filename or "Untitled test",
         robot_name=meta.get("robot_name"),
-        test_type=meta.get("test_type", "drivetrain_resistance_v1"),
+        test_type=meta.get("test_type") or _infer_default_test_type(parsed.rows),
         recorded_at=_parse_iso(meta.get("timestamp")),
         commanded_cruise_rpm=_parse_optional_float(meta.get("commanded_cruise_rpm")),
         trial_count=_parse_optional_int(meta.get("trial_count")),

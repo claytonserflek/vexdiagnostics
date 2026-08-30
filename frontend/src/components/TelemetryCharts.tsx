@@ -126,6 +126,10 @@ export function TelemetryCharts({ series }: { series: TelemetrySeries }) {
 
   const velocityData = useMemo(() => buildTrialData(series, trial, "actual_velocity_rpm"), [series, trial]);
   const currentData = useMemo(() => buildTrialData(series, trial, "current_ma"), [series, trial]);
+  const hasCommandedData = useMemo(
+    () => Object.values(series).some((points) => points.some((p) => p.commanded_velocity_rpm !== null)),
+    [series],
+  );
 
   if (motorLabels.length === 0) {
     return null;
@@ -186,7 +190,7 @@ export function TelemetryCharts({ series }: { series: TelemetrySeries }) {
         colorByLabel={colorByLabel}
         visible={visible}
         unit="RPM"
-        showCommanded
+        showCommanded={hasCommandedData}
       />
       <Chart
         title="Current vs. Time (A)"

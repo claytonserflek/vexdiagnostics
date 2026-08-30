@@ -8,6 +8,7 @@ ids/labels returned rather than global counts.
 import io
 import os
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -67,6 +68,48 @@ def test_import_baseline_and_after_and_compare():
     assert compare_resp.status_code == 200
     comparison = compare_resp.json()["comparison"]
     assert comparison["side_asymmetry_after_pts"] < comparison["side_asymmetry_before_pts"]
+
+
+GENERIC_CSV = b"""timestamp,motor_name,velocity_rpm,current_amp,voltage_v,temperature_c,torque_nm
+0.0,front_left,198,1.21,11.92,31.2,0.18
+0.0,back_left,201,1.18,11.94,30.8,0.17
+0.0,front_right,164,2.08,11.71,35.4,0.31
+0.0,back_right,197,1.24,11.90,31.5,0.18
+"""
+
+
+def test_import_generic_csv_with_no_metadata():
+    """The exact example from the feature request: no "# key=value" lines
+    at all, generic column names, time in seconds, current in amps,
+    voltage in volts. Must auto-detect the 4 motors and import cleanly."""
+    resp = client.post(
+        "/api/tests/import",
+        files={"file": ("generic.csv", io.BytesIO(GENERIC_CSV), "text/csv")},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+
+    assert set(body["test"]["motors"].keys()) == {"front_left", "back_left", "front_right", "back_right"}
+    # No "# test_type=" was given, but the motor names resolve to a left
+    # and a right side, so the default label reflects that.
+    assert body["test"]["test_type"] == "drivetrain_resistance_v1"
+    assert body["test"]["commanded_cruise_rpm"] is None
+
+    diagnostics = body["diagnostics"]
+    by_label = {s["label"]: s for s in diagnostics["motor_summaries"]}
+    # Units were converted: 2.08 A -> 2080 mA.
+    assert by_label["front_right"]["current_mean"] == pytest.approx(2080.0, rel=0.01)
+    # No commanded data anywhere, so velocity-deficit diagnostics are
+    # unavailable rather than invented, but current-based comparison and
+    # per-motor findings still work.
+    assert all(s["velocity_deficit_mean"] is None for s in diagnostics["motor_summaries"])
+    findings_by_label = {f["label"]: f for f in diagnostics["motor_findings"]}
+    assert findings_by_label["front_right"]["classification"] in ("High Resistance", "Possible High Resistance")
+
+    test_id = body["test"]["id"]
+    telemetry_resp = client.get(f"/api/tests/{test_id}/telemetry")
+    assert telemetry_resp.status_code == 200
+    assert set(telemetry_resp.json().keys()) == {"front_left", "back_left", "front_right", "back_right"}
 
 
 def test_import_rejects_invalid_csv():

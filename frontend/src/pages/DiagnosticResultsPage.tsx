@@ -4,7 +4,9 @@ import type { TelemetrySeries, TestDetailResponse } from "../types";
 import {
   abnormalityDescription,
   computeSideResistanceScore,
-  INSPECT_AREAS,
+  hasDrivetrainMotors,
+  inspectAreasFor,
+  orderMotorsForDisplay,
   overallStatus,
   resistanceScoreStatus,
   resultHeadline,
@@ -12,6 +14,7 @@ import {
 } from "../health";
 import { StatusPill } from "../components/StatusBadge";
 import { Num } from "../components/Num";
+import { MotorCard } from "../components/MotorCard";
 import { TelemetryCharts } from "../components/TelemetryCharts";
 import { SkeletonPanel } from "../components/Skeleton";
 import { IconWarning } from "../components/Icons";
@@ -20,14 +23,13 @@ import { formatTestDate } from "../dateFormat";
 function SideCard({
   side,
   label,
-  detail,
+  diagnostics,
 }: {
   side: "L" | "R";
   label: string;
-  detail: TestDetailResponse;
+  diagnostics: TestDetailResponse["diagnostics"];
 }) {
-  const { test, diagnostics } = detail;
-  const { avgCurrentA, avgVelocity, motorCount } = sideAverages(side, diagnostics, test.commanded_cruise_rpm);
+  const { avgCurrentA, avgVelocity, motorCount } = sideAverages(side, diagnostics);
   const score = computeSideResistanceScore(side, diagnostics);
   const status = score !== null ? resistanceScoreStatus(score) : null;
 
@@ -102,6 +104,10 @@ export function DiagnosticResultsPage({
 
   const { test, diagnostics } = detail;
   const flaggedMotors = diagnostics.motor_findings.filter((f) => f.classification !== "Normal");
+  const summaryByLabel = new Map(diagnostics.motor_summaries.map((s) => [s.label, s]));
+  const showDrivetrain = hasDrivetrainMotors(diagnostics);
+  const orderedMotors = orderMotorsForDisplay(diagnostics.motor_summaries);
+  const findingByLabel = new Map(diagnostics.motor_findings.map((f) => [f.label, f]));
 
   return (
     <>
@@ -118,7 +124,7 @@ export function DiagnosticResultsPage({
             </h1>
             <p className="page-subtitle" style={{ marginBottom: 0 }}>
               {test.robot_name ?? "Unnamed robot"} &middot; {formatTestDate(test.recorded_at, test.imported_at)}
-              {test.commanded_cruise_rpm ? ` · ${test.commanded_cruise_rpm} RPM cruise` : ""}
+              {test.commanded_cruise_rpm ? ` · ${test.commanded_cruise_rpm} RPM commanded` : ""}
               {test.trial_count ? ` · ${test.trial_count} trials` : ""}
             </p>
           </div>
@@ -140,10 +146,22 @@ export function DiagnosticResultsPage({
         )}
       </div>
 
-      <div className="side-compare-grid section-gap">
-        <SideCard side="L" label="Left Drivetrain" detail={detail} />
-        <SideCard side="R" label="Right Drivetrain" detail={detail} />
+      <h2 style={{ fontSize: "0.95rem", margin: "28px 0 12px" }}>Detected Motors</h2>
+      <div className="motor-grid">
+        {orderedMotors.map((s) => (
+          <MotorCard key={s.label} summary={s} finding={findingByLabel.get(s.label)} />
+        ))}
       </div>
+
+      {showDrivetrain && (
+        <div className="section-gap">
+          <h2 style={{ fontSize: "0.95rem", margin: "0 0 12px" }}>Drivetrain Analysis</h2>
+          <div className="side-compare-grid">
+            <SideCard side="L" label="Left Drivetrain" diagnostics={diagnostics} />
+            <SideCard side="R" label="Right Drivetrain" diagnostics={diagnostics} />
+          </div>
+        </div>
+      )}
 
       {telemetry && (
         <div className="section-gap">
@@ -169,7 +187,7 @@ export function DiagnosticResultsPage({
                 Possible areas to inspect:
               </p>
               <ul>
-                {INSPECT_AREAS.map((area) => (
+                {inspectAreasFor(summaryByLabel.get(f.label)).map((area) => (
                   <li key={area}>{area}</li>
                 ))}
               </ul>

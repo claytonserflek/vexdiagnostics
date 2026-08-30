@@ -2,28 +2,37 @@
 
 A diagnostic and troubleshooting tool for VEX V5 robotics teams. It turns
 "the right side feels like it has more friction" into a quantitative,
-repeatable test: run a standardized drivetrain test, get a per-motor
-resistance estimate backed by actual telemetry and simple statistics,
+repeatable test: import motor telemetry, get a per-motor resistance/
+abnormality estimate backed by actual telemetry and simple statistics,
 make a mechanical change, and re-test to check whether it actually
 helped.
 
-This is the MVP: **drivetrain resistance diagnostics only**. See
-`docs/architecture.md` for what's deliberately out of scope for now and
-why.
+The importer and diagnostics engine work on telemetry from **any VEX
+mechanism** -- drivetrain, intake, lift, arm, flywheel -- not only a
+drivetrain. Left/right drivetrain comparison is a specialization that
+activates automatically when motor names support it (see
+`docs/diagnostics-algorithm.md`); it's never assumed. See
+`docs/architecture.md` for what's deliberately out of scope and why.
 
 ## How it works, end to end
 
-1. Run the standardized test on the robot (`firmware/drivetrain_test`) --
-   elevated on stands, wheels spinning freely, same commanded velocity
-   sent to every drivetrain motor. Telemetry is logged to the Brain's SD
-   card as CSV.
-2. Pull the SD card, import the CSV into the app.
-3. The backend (deterministic math, no AI/ML) computes velocity/current
-   comparisons between motors and between left/right sides, and flags
-   where the evidence suggests elevated mechanical resistance.
-4. The frontend shows a drivetrain resistance map, per-motor findings,
-   raw velocity/current graphs, and lets you compare a "before" and
-   "after" test to see whether a fix actually reduced the asymmetry.
+1. Run a test on the robot (see `firmware/drivetrain_test` for the
+   standardized drivetrain test, or export telemetry from whatever
+   program you're already running against any other mechanism).
+   Telemetry is logged to the Brain's SD card as CSV.
+2. Pull the SD card, import the CSV into the app. Most metadata is
+   optional -- motors are auto-detected from the data, and common column
+   name variants (`velocity_rpm`, `current_amp`, `time_s`, ...) are
+   recognized and unit-converted automatically. See
+   `docs/telemetry-csv-schema.md`.
+3. The backend (deterministic math, no AI/ML) computes current/velocity
+   comparisons between comparable motors -- and between left/right sides
+   when motor names support it -- and flags where the evidence suggests
+   abnormal resistance or behavior.
+4. The frontend shows per-motor findings and telemetry graphs for any
+   mechanism, a drivetrain resistance map when applicable, and lets you
+   compare a "before" and "after" test to see whether a fix actually
+   helped.
 
 Read `docs/architecture.md` first -- it explains why telemetry transfer
 works this way (no live wireless link exists on stock V5 hardware) and

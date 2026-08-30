@@ -68,3 +68,37 @@ def build_run(resistance_by_motor: dict, trials: int = 3, seed: int = 1, noise: 
                     t += SAMPLE_INTERVAL_MS
                 t = phase_end
     return samples
+
+
+def build_uncommanded_run(motor_profiles: dict, trials: int = 3, seed: int = 1, samples_per_trial: int = 20) -> list:
+    """Build synthetic telemetry with NO commanded velocity at all --
+    simulates a generic (non-drivetrain) mechanism logged passively, the
+    way the feature-request's example CSV has no target/commanded column.
+
+    motor_profiles: {"intake": {"velocity": 500, "current": 800}, ...}
+    Optional per-motor keys: velocity_noise, current_noise, temperature.
+    """
+    rng = random.Random(seed)
+    samples: list = []
+    for trial in range(1, trials + 1):
+        for label, profile in motor_profiles.items():
+            for i in range(samples_per_trial):
+                t = i * SAMPLE_INTERVAL_MS
+                velocity = profile["velocity"] + rng.gauss(0, profile.get("velocity_noise", 2.0))
+                current = max(0.0, profile["current"] + rng.gauss(0, profile.get("current_noise", 15.0)))
+                samples.append(
+                    TelemetrySample(
+                        timestamp_ms=t,
+                        motor_label=label,
+                        commanded_velocity_rpm=None,
+                        actual_velocity_rpm=velocity,
+                        current_ma=current,
+                        voltage_mv=None,
+                        power_w=None,
+                        torque_nm=None,
+                        temperature_c=profile.get("temperature"),
+                        position_deg=None,
+                        trial=trial,
+                    )
+                )
+    return samples

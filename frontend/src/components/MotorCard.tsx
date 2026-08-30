@@ -1,5 +1,5 @@
 import type { MotorFinding, MotorSummary } from "../types";
-import { estimateVelocityRpm, motorFindingStatus, STATUS_LABEL } from "../health";
+import { motorFindingStatus, STATUS_LABEL } from "../health";
 import { Num } from "./Num";
 
 const POSITION_NAME: Record<string, string> = {
@@ -12,14 +12,11 @@ const POSITION_NAME: Record<string, string> = {
 export function MotorCard({
   summary,
   finding,
-  commandedRpm,
 }: {
   summary: MotorSummary;
   finding: MotorFinding | undefined;
-  commandedRpm: number | null;
 }) {
   const status = finding ? motorFindingStatus(finding.classification) : "healthy";
-  const velocity = estimateVelocityRpm(summary, commandedRpm);
   const currentAmps = summary.current_mean !== null ? summary.current_mean / 1000 : null;
 
   return (
@@ -30,7 +27,7 @@ export function MotorCard({
       <div className="motor-card-metrics">
         <div className="motor-metric">
           <div className="value">
-            <Num value={velocity} digits={0} unit="RPM" />
+            <Num value={summary.avg_velocity_rpm_mean} digits={0} unit="RPM" />
           </div>
           <div className="label">Velocity</div>
         </div>
@@ -50,7 +47,7 @@ export function MotorCard({
           <div className="value" style={{ fontSize: "0.82rem" }}>
             {finding ? STATUS_LABEL[status] : "Healthy"}
           </div>
-          <div className="label">Resistance</div>
+          <div className="label">Condition</div>
         </div>
       </div>
     </div>

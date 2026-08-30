@@ -144,41 +144,48 @@ export function computeSideResistanceScore(side: "L" | "R", diagnostics: Diagnos
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
-/**
- * Approximate steady-state velocity, back-derived from the backend's
- * velocity_deficit_mean (%) and the test's commanded cruise RPM:
- * actual ≈ commanded * (1 - deficit/100). This is how the backend
- * computed the deficit in the first place (see Step 1 of
- * docs/diagnostics-algorithm.md), just run in reverse for display --
- * it is an average over the test's steady-state windows, not a live
- * instantaneous reading.
- */
-export function estimateVelocityRpm(summary: MotorSummary, commandedRpm: number | null): number | null {
-  if (commandedRpm === null || summary.velocity_deficit_mean === null) return null;
-  return commandedRpm * (1 - summary.velocity_deficit_mean / 100);
-}
-
 export function statusColorVar(status: StatusTier | "unknown"): string {
   return status === "unknown" ? "var(--status-neutral)" : `var(--status-${status})`;
 }
 
-/** Average current (A) and approximate average velocity (RPM) across a
- * side's motors -- shared by the results page and the compare page so
- * the same numbers are computed the same way in both places. */
+/** Average current (A) and average velocity (RPM) across a side's
+ * motors -- shared by the results page and the compare page so the same
+ * numbers are computed the same way in both places. avg_velocity_rpm_mean
+ * comes straight from the backend (a real measured average, not
+ * back-derived from a commanded speed), so this works whether or not the
+ * test had commanded-velocity telemetry at all. */
 export function sideAverages(
   side: "L" | "R",
   diagnostics: DiagnosticsResult,
-  commandedRpm: number | null,
 ): { avgCurrentA: number | null; avgVelocity: number | null; motorCount: number } {
   const motors = diagnostics.motor_summaries.filter((s) => s.side === side);
   const currents = motors.map((m) => m.current_mean).filter((v): v is number => v !== null);
-  const deficits = motors.map((m) => m.velocity_deficit_mean).filter((v): v is number => v !== null);
+  const velocities = motors.map((m) => m.avg_velocity_rpm_mean).filter((v): v is number => v !== null);
 
   const avgCurrentA = currents.length ? mean(currents)! / 1000 : null;
-  const avgDeficit = deficits.length ? mean(deficits) : null;
-  const avgVelocity = avgDeficit !== null && commandedRpm !== null ? commandedRpm * (1 - avgDeficit / 100) : null;
+  const avgVelocity = velocities.length ? mean(velocities) : null;
 
   return { avgCurrentA, avgVelocity, motorCount: motors.length };
+}
+
+/** True when this test has at least one motor whose label resolved to a
+ * left/right side -- the signal used everywhere in the UI to decide
+ * whether to show drivetrain-specific sections (the side comparison
+ * panel, the top-down layout diagram) at all. A generic mechanism (an
+ * intake, an arm, a claw, ...) never trips this. */
+export function hasDrivetrainMotors(diagnostics: DiagnosticsResult): boolean {
+  return diagnostics.motor_summaries.some((s) => s.side !== null);
+}
+
+/** "drivetrain_resistance_v1" -> "Drivetrain Resistance",
+ * "motor_telemetry_v1" -> "Motor Telemetry". Purely cosmetic. */
+export function formatTestType(testType: string): string {
+  const stripped = testType.replace(/_v\d+$/i, "");
+  return stripped
+    .split("_")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
 }
 
 /** Bucketing for the per-side resistance score, which runs the opposite
@@ -190,7 +197,28 @@ export function resistanceScoreStatus(score: number): StatusTier {
   return "healthy";
 }
 
-export const INSPECT_AREAS = ["Shaft alignment", "Bearing friction", "Gear spacing", "Wheel contact", "Frame alignment"];
+export const INSPECT_AREAS_DRIVETRAIN = [
+  "Shaft alignment",
+  "Bearing friction",
+  "Gear spacing",
+  "Wheel contact",
+  "Frame alignment",
+];
+
+export const INSPECT_AREAS_GENERIC = [
+  "Mounting and fasteners",
+  "Bearing condition",
+  "Gear engagement",
+  "Belt or chain tension",
+  "Obstruction in the mechanism",
+];
+
+/** Drivetrain-specific inspection points only make sense for a motor
+ * that's actually part of an identified drivetrain side; anything else
+ * (an intake, an arm, a claw, ...) gets the generic mechanical list. */
+export function inspectAreasFor(summary: MotorSummary | undefined): string[] {
+  return summary?.side ? INSPECT_AREAS_DRIVETRAIN : INSPECT_AREAS_GENERIC;
+}
 
 /** A short dashboard/results headline. The full statistical explanation
  * (docs/diagnostics-algorithm.md-level detail) stays available as
@@ -205,12 +233,14 @@ export function resultHeadline(diagnostics: DiagnosticsResult): string {
     return `Possible resistance detected on ${sideName} drivetrain`;
   }
   if (diagnostics.overall_classification === "possible") {
-    return "Possible localized resistance detected";
+    return "Possible motor abnormality detected";
   }
   if (diagnostics.overall_classification === "normal") {
-    return "No significant resistance asymmetry detected";
+    return hasDrivetrainMotors(diagnostics)
+      ? "No significant resistance asymmetry detected"
+      : "No abnormal motor behavior detected";
   }
-  return "Not enough matching telemetry to compare sides";
+  return "Not enough matching telemetry to compare motors";
 }
 
 /** Careful, non-overclaiming description of what a flagged motor's
@@ -219,18 +249,18 @@ export function abnormalityDescription(finding: MotorFinding): string {
   const velUp = (finding.velocity_gap_pts ?? 0) > 0;
   const curUp = (finding.current_gap_pct ?? 0) > 0;
   if (finding.classification === "Possible Mechanism Binding") {
-    return "Slower acceleration to commanded speed than equivalent drivetrain motors, without a matching steady-state velocity or current difference -- a pattern more consistent with something intermittently catching than steady resistance.";
+    return "Slower acceleration (or slower ramp-up) than equivalent motors, without a matching steady-state velocity or current difference -- a pattern more consistent with something intermittently catching than steady resistance.";
   }
   if (velUp && curUp) {
-    return "Higher current draw combined with lower velocity compared with equivalent drivetrain motors under the same commanded speed.";
+    return "Higher current draw combined with lower velocity compared with equivalent motors in this test.";
   }
   if (curUp) {
-    return "Higher current draw than equivalent drivetrain motors under the same commanded speed.";
+    return "Higher current draw than equivalent motors in this test.";
   }
   if (velUp) {
-    return "Lower velocity than equivalent drivetrain motors under the same commanded speed.";
+    return "Lower velocity than equivalent motors in this test.";
   }
-  return "Telemetry differs from equivalent drivetrain motors under the same commanded speed.";
+  return "Telemetry differs from equivalent motors in this test.";
 }
 
 /** Front/back + left/right layout slot, guessed from a motor's label for

@@ -44,9 +44,10 @@ export function SettingsPage({
       <div className="panel" style={{ maxWidth: 480 }}>
         <h3 className="panel-title">About</h3>
         <p className="panel-hint" style={{ marginBottom: 0 }}>
-          VEX Diagnostics analyzes drivetrain telemetry with deterministic statistics -- no AI/ML in the
-          diagnostic path. See the project README and <code className="mono">docs/</code> for the full test
-          protocol and algorithm.
+          VEX Diagnostics analyzes motor telemetry from any mechanism with deterministic statistics -- no AI/ML
+          in the diagnostic path. Left/right drivetrain comparison runs automatically when motor names support
+          it. See the project README and <code className="mono">docs/</code> for the full test protocol and
+          algorithm.
         </p>
       </div>
     </>

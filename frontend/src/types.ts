@@ -29,9 +29,12 @@ export type MotorClassification =
 export interface MotorSummary {
   label: string;
   side: "L" | "R" | null;
+  has_commanded_data: boolean;
   n_phase_samples: number;
   velocity_deficit_mean: number | null;
   velocity_deficit_sd: number | null;
+  avg_velocity_rpm_mean: number | null;
+  avg_velocity_rpm_sd: number | null;
   current_mean: number | null;
   current_sd: number | null;
   current_cov: number | null;
@@ -78,7 +81,7 @@ export interface TestDetailResponse {
 export interface TelemetryPoint {
   timestamp_ms: number;
   trial: number;
-  commanded_velocity_rpm: number;
+  commanded_velocity_rpm: number | null;
   actual_velocity_rpm: number;
   current_ma: number | null;
   temperature_c: number | null;

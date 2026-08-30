@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getTest } from "../api";
 import type { TestListItem } from "../types";
-import { computeHealthScore, overallStatus, worstMotorFinding, type StatusTier } from "../health";
+import { computeHealthScore, formatTestType, overallStatus, worstMotorFinding, type StatusTier } from "../health";
 import { StatusPill } from "../components/StatusBadge";
 import { EmptyState } from "../components/EmptyState";
 import { Skeleton } from "../components/Skeleton";
@@ -73,14 +73,14 @@ export function TestHistoryPage({
     <>
       <div className="page-header">
         <h1 className="page-title">Test History</h1>
-        <p className="page-subtitle">Every imported drivetrain diagnostic run for this robot.</p>
+        <p className="page-subtitle">Every imported diagnostic run for this robot, across any mechanism.</p>
       </div>
 
       {tests.length === 0 ? (
         <div className="panel">
           <EmptyState
             title="No tests recorded yet"
-            hint="Imported diagnostic runs will show up here so you can track how your robot changes across a season."
+            hint="Imported diagnostic runs, for any mechanism, will show up here so you can track how your robot changes across a season."
             action={
               <button type="button" className="btn primary" onClick={onRunDiagnostic}>
                 Run Diagnostic
@@ -119,6 +119,7 @@ export function TestHistoryPage({
                 <tr>
                   <th>Date</th>
                   <th>Test</th>
+                  <th>Type</th>
                   <th>Robot</th>
                   <th>Health</th>
                   <th>Flagged Motor</th>
@@ -129,7 +130,7 @@ export function TestHistoryPage({
                 {!filtered
                   ? tests.map((t) => (
                       <tr key={t.id}>
-                        <td colSpan={6}>
+                        <td colSpan={7}>
                           <Skeleton width="100%" height={16} />
                         </td>
                       </tr>
@@ -138,6 +139,7 @@ export function TestHistoryPage({
                       <tr key={r.test.id} onClick={() => onOpenTest(r.test.id)} tabIndex={0} role="button">
                         <td>{formatTestDate(r.test.recorded_at, r.test.imported_at)}</td>
                         <td>{r.test.name}</td>
+                        <td className="muted">{formatTestType(r.test.test_type)}</td>
                         <td>{r.test.robot_name ?? "—"}</td>
                         <td className="mono">{r.score ?? "—"}</td>
                         <td className="mono">{r.flaggedMotor ?? "—"}</td>

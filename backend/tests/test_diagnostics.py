@@ -1,6 +1,6 @@
 from app import diagnostics as diag
 
-from .helpers import build_run
+from .helpers import build_run, build_uncommanded_run
 
 
 def test_infer_side_recognizes_common_patterns():
@@ -78,3 +78,87 @@ def test_unrecognized_labels_are_summarized_but_not_side_compared():
     assert result.side_comparisons == []
     for s in result.motor_summaries:
         assert s.side is None
+
+
+# ---------------------------------------------------------------------------
+# Mechanism-agnostic / uncommanded-mode behavior
+# ---------------------------------------------------------------------------
+
+
+def test_missing_commanded_rpm_marks_velocity_deficit_unavailable():
+    samples = build_uncommanded_run(
+        {"m1": {"velocity": 500, "current": 800}, "m2": {"velocity": 500, "current": 800}}, seed=31
+    )
+    result = diag.compute_diagnostics(samples)
+
+    assert result.overall_classification != "insufficient_data"
+    for summary in result.motor_summaries:
+        assert summary.has_commanded_data is False
+        # The diagnostic that specifically depends on a commanded speed is
+        # unavailable, not invented -- it stays None rather than being
+        # backfilled with a guess.
+        assert summary.velocity_deficit_mean is None
+        assert summary.accel_lag_mean is None
+        # But current and raw velocity, which don't depend on a commanded
+        # target, are still fully computed.
+        assert summary.current_mean is not None
+        assert summary.avg_velocity_rpm_mean is not None
+
+
+def test_generic_mechanism_flags_motor_with_elevated_current_and_low_velocity():
+    samples = build_uncommanded_run(
+        {
+            "intake": {"velocity": 500, "current": 800},
+            "arm": {"velocity": 500, "current": 800},
+            "claw": {"velocity": 350, "current": 1400},
+        },
+        seed=33,
+    )
+    result = diag.compute_diagnostics(samples)
+
+    findings_by_label = {f.label: f for f in result.motor_findings}
+    assert findings_by_label["claw"].classification in ("High Resistance", "Possible High Resistance")
+    assert findings_by_label["intake"].classification == "Normal"
+    assert findings_by_label["arm"].classification == "Normal"
+    assert result.overall_classification == "possible"
+    # No drivetrain-flavored or left/right language for a mechanism with no
+    # side data at all.
+    assert "drivetrain" not in result.overall_summary.lower()
+    assert "left/right" not in result.overall_summary.lower()
+
+
+def test_uncommanded_drivetrain_named_motors_still_get_current_side_comparison():
+    """No commanded column at all (like the feature request's example CSV),
+    but the motor names ARE drivetrain-shaped. Velocity-based side
+    comparison requires commanded data and stays unavailable, but current
+    doesn't depend on it and should still produce a real comparison."""
+    samples = build_uncommanded_run(
+        {
+            "front_left": {"velocity": 198, "current": 1210},
+            "back_left": {"velocity": 201, "current": 1180},
+            "front_right": {"velocity": 164, "current": 2080},
+            "back_right": {"velocity": 197, "current": 1240},
+        },
+        seed=37,
+        trials=3,
+    )
+    result = diag.compute_diagnostics(samples)
+
+    vel_comp = next((c for c in result.side_comparisons if c.metric == "velocity_deficit_pct"), None)
+    cur_comp = next((c for c in result.side_comparisons if c.metric == "steady_current_ma"), None)
+    assert vel_comp is None  # genuinely unavailable without commanded data
+    assert cur_comp is not None
+    assert cur_comp.mean_diff > 0  # right side draws more current
+
+    findings_by_label = {f.label: f for f in result.motor_findings}
+    assert findings_by_label["front_right"].classification in ("High Resistance", "Possible High Resistance")
+
+
+def test_overall_summary_generic_when_no_side_data_but_normal():
+    samples = build_uncommanded_run(
+        {"intake": {"velocity": 500, "current": 800}, "arm": {"velocity": 500, "current": 800}}, seed=41
+    )
+    result = diag.compute_diagnostics(samples)
+
+    assert result.overall_classification == "normal"
+    assert "drivetrain" not in result.overall_summary.lower()

@@ -52,8 +52,9 @@ backend/                    FastAPI + SQLite service:
 
 frontend/                   React + Vite app:
                                - upload a CSV, see results
-                               - per-motor telemetry charts
+                               - per-motor telemetry charts, any mechanism
                                - drivetrain resistance visualization
+                                 (shown only when motor names support it)
                                - test history list
                                - before/after comparison view
 
@@ -70,6 +71,13 @@ docs/                        protocol, schema, algorithm writeups (this folder)
   only statistically/practically flagged abnormalities and a list of
   plausible mechanical causes to inspect, consistent with what current
   draw / velocity error can and cannot prove.
-- Non-drivetrain subsystems (arms, intakes, etc.) are out of scope for the
-  MVP; the schema and engine are written so they can be added later without
-  a redesign (a "subsystem" is just another group of comparable motors).
+- The importer and diagnostics engine work on telemetry from any
+  mechanism (drivetrain, intake, lift, arm, flywheel, ...), not only
+  drivetrains -- see `telemetry-csv-schema.md` and
+  `diagnostics-algorithm.md`. Left/right side comparison is a
+  specialization that only activates when motor names support it; it is
+  never assumed.
+- One CSV is still assumed to represent one mechanism's test run. The
+  engine does not attempt to separate multiple unrelated mechanisms
+  mixed into a single import -- that stays a documented limitation, not
+  a supported workflow.

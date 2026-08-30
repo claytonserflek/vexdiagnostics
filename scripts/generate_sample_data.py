@@ -109,6 +109,49 @@ def write_csv(path: str, test_name: str, notes: str, resistance_by_motor: dict, 
     print(f"Wrote {path}")
 
 
+def write_generic_csv(path: str, motors: dict, resistance_by_motor: dict, seed: int, trials: int = 1):
+    """A metadata-free, generic-column-name CSV with no commanded/target
+    column at all -- demonstrates the "any mechanism, no metadata"
+    import path (docs/telemetry-csv-schema.md), not just the
+    metadata-rich canonical schema the other files use. Includes a
+    "run" column (one of the recognized trial aliases) whenever
+    trials > 1, since multiple trials at the same timestamps would
+    otherwise collide.
+    """
+    rng = random.Random(seed)
+    header = "timestamp,motor_name,velocity_rpm,current_amp,voltage_v,temperature_c,torque_nm"
+    if trials > 1:
+        header += ",run"
+    lines = [header]
+
+    temp = {label: 24.0 for label in motors}
+
+    for trial in range(1, trials + 1):
+        motor_samples = {
+            label: simulate_motor_trial(PHASES, resistance_by_motor.get(label, 0.0), rng) for label in motors
+        }
+        n = len(next(iter(motor_samples.values())))
+        for i in range(n):
+            for label in motors:
+                t_ms, commanded, actual, current_ma = motor_samples[label][i]
+                temp[label] += 0.00025 * (1 + 2 * resistance_by_motor.get(label, 0.0)) * abs(commanded) / 200.0
+                current_a = current_ma / 1000.0
+                voltage_v = (12500 - 3.0 * current_ma) / 1000.0
+                torque_nm = 0.35 * current_a
+                row = (
+                    f"{t_ms / 1000.0:.3f},{label},{actual:.2f},{current_a:.3f},{voltage_v:.2f},"
+                    f"{temp[label]:.2f},{torque_nm:.3f}"
+                )
+                if trials > 1:
+                    row += f",{trial}"
+                lines.append(row)
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    print(f"Wrote {path}")
+
+
 def main():
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     out_dir = os.path.join(repo_root, "sample-data")
@@ -129,6 +172,26 @@ def main():
         notes="Robot elevated on foam blocks. After re-spacing right-side gears and re-shimming BR shaft.",
         resistance_by_motor={"FL": 0.04, "BL": 0.04, "FR": 0.10, "BR": 0.08},
         seed=43,
+    )
+
+    # Generic, metadata-free CSV: drivetrain-shaped motor names but NO
+    # commanded/target column at all -- current-only comparison still
+    # flags the resistance on front_right.
+    write_generic_csv(
+        os.path.join(out_dir, "generic_no_metadata_drivetrain.csv"),
+        motors={"front_left": 11, "front_right": 12, "back_left": 13, "back_right": 14},
+        resistance_by_motor={"front_left": 0.03, "back_left": 0.05, "front_right": 0.4, "back_right": 0.1},
+        seed=44,
+        trials=3,
+    )
+
+    # Generic, metadata-free CSV with a non-drivetrain mechanism -- no
+    # side comparison should ever appear for this one.
+    write_generic_csv(
+        os.path.join(out_dir, "generic_intake_test.csv"),
+        motors={"intake": 1, "kicker": 2},
+        resistance_by_motor={"intake": 0.03, "kicker": 0.35},
+        seed=45,
     )
 
 

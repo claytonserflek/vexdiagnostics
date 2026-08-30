@@ -141,12 +141,8 @@ export function CompareTestsPage({
   const focusSide = result?.before.diagnostics.worse_side ?? result?.after.diagnostics.worse_side ?? null;
   const beforeScore = focusSide ? computeSideResistanceScore(focusSide, result!.before.diagnostics) : null;
   const afterScore = focusSide ? computeSideResistanceScore(focusSide, result!.after.diagnostics) : null;
-  const beforeAvgs = focusSide
-    ? sideAverages(focusSide, result!.before.diagnostics, result!.before.test.commanded_cruise_rpm)
-    : null;
-  const afterAvgs = focusSide
-    ? sideAverages(focusSide, result!.after.diagnostics, result!.after.test.commanded_cruise_rpm)
-    : null;
+  const beforeAvgs = focusSide ? sideAverages(focusSide, result!.before.diagnostics) : null;
+  const afterAvgs = focusSide ? sideAverages(focusSide, result!.after.diagnostics) : null;
 
   return (
     <>

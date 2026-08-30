@@ -39,7 +39,7 @@ def test_compare_warns_on_different_commanded_rpm():
         before_meta={"commanded_cruise_rpm": 200},
         after_meta={"commanded_cruise_rpm": 300},
     )
-    assert any("different commanded cruise velocities" in w for w in result.warnings)
+    assert any("different commanded speeds" in w for w in result.warnings)
 
 
 def test_compare_warns_on_mismatched_motor_labels():

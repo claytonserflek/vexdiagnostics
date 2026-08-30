@@ -48,7 +48,7 @@ def compare_tests(
     after_rpm = after_meta.get("commanded_cruise_rpm")
     if before_rpm is not None and after_rpm is not None and before_rpm != after_rpm:
         warnings.append(
-            "The two tests used different commanded cruise velocities "
+            "The two tests used different commanded speeds "
             f"({before_rpm} vs {after_rpm} RPM); percentage comparisons may not be directly meaningful."
         )
 

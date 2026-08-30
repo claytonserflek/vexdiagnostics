@@ -91,9 +91,10 @@ export function RunDiagnosticPage({ onComplete }: { onComplete: (result: TestDet
   return (
     <>
       <div className="page-header">
-        <h1 className="page-title">Run Drivetrain Diagnostic</h1>
+        <h1 className="page-title">Run Diagnostic</h1>
         <p className="page-subtitle">
-          Run a standardized drivetrain test and analyze motor telemetry for abnormal mechanical resistance.
+          Import motor telemetry from any mechanism -- drivetrain, intake, lift, arm, flywheel -- and analyze it
+          for abnormal mechanical resistance or behavior.
         </p>
       </div>
 
@@ -127,7 +128,7 @@ export function RunDiagnosticPage({ onComplete }: { onComplete: (result: TestDet
                 >
                   <IconUpload style={{ color: "var(--text-tertiary)", marginBottom: 8 }} />
                   <div className="dropzone-title">Drag and drop a telemetry CSV, or click to browse</div>
-                  <div className="dropzone-hint">Exported from the drivetrain test program via SD card</div>
+                  <div className="dropzone-hint">Exported from your VEX telemetry program via SD card</div>
                   <input
                     ref={inputRef}
                     type="file"
@@ -172,7 +173,7 @@ export function RunDiagnosticPage({ onComplete }: { onComplete: (result: TestDet
                     <div className="value">{preview.robotName ?? "—"}</div>
                   </div>
                   <div className="config-item">
-                    <div className="label">Cruise speed</div>
+                    <div className="label">Commanded speed</div>
                     <div className="value">{preview.commandedCruiseRpm ? `${preview.commandedCruiseRpm} RPM` : "—"}</div>
                   </div>
                   <div className="config-item">
